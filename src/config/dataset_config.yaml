@@ -1,0 +1,28 @@
+dataset:
+  augmentations:
+    brightness_contrast: 0.2
+    enabled: true
+    horizontal_flip: 0.5
+    noise_probability: 0.3
+    rotation_limit: 15
+  balance_strategy: null
+  cache_images: false
+  class_mapping:
+    0: MILCO
+    1: NOMBO
+  data_path: ./Data/
+  enhance_sonar: true
+  image_size:
+  - 512
+  - 512
+  normalize: true
+  splits:
+    temporal:
+      test_years:
+      - '2021'
+      train_years:
+      - '2010'
+      - '2015'
+      - '2017'
+      val_years:
+      - '2018'

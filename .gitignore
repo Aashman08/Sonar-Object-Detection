@@ -3,6 +3,10 @@
 2017/
 2018/
 2021/
+Data/
 
 *weights
 *conv*
+
+__pycache__/
+.DS_Store
