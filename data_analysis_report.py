@@ -13,7 +13,7 @@ import seaborn as sns
 from pathlib import Path
 
 class SonarDataAnalyzer:
-    def __init__(self, dataset_path="."):
+    def __init__(self, dataset_path="./Data/"):
         self.dataset_path = Path(dataset_path)
         self.class_names = {0: "MILCO", 1: "NOMBO"}
         self.years = ["2010", "2015", "2017", "2018", "2021"]

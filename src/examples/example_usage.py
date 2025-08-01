@@ -74,38 +74,7 @@ def example_1_basic_dataset():
     
     return dataset
 
-
-def example_2_temporal_splitting():
-    """Example 2: Temporal data splitting"""
-    print("\n" + "="*60)
-    print("EXAMPLE 2: Temporal Data Splitting")
-    print("="*60)
-    
-    # Create temporal splitter
-    splitter = TemporalSplitter(
-        train_years=["2010", "2015", "2017"],
-        val_years=["2018"],
-        test_years=["2021"]
-    )
-    
-    # Create splits
-    datasets = splitter.create_splits(
-        data_path="./Data/",
-        image_size=(512, 512),
-        enhance_sonar=True
-    )
-    
-    print("Temporal splits created:")
-    for split_name, dataset in datasets.items():
-        stats = dataset.get_statistics()
-        print(f"  {split_name:5}: {len(dataset):4} samples, "
-              f"{stats['positive_samples']:3} positive, "
-              f"{stats['positive_rate']:.1%} positive rate")
-    
-    return datasets
-
-
-def example_3_dataloader_integration():
+def example_2_dataloader_integration():
     """Example 3: DataLoader integration with batching"""
     print("\n" + "="*60)
     print("EXAMPLE 3: DataLoader Integration")
@@ -157,7 +126,7 @@ def example_3_dataloader_integration():
     return dataloaders
 
 
-def example_4_augmentation_comparison():
+def example_3_augmentation_comparison():
     """Example 4: Compare original vs augmented data"""
     print("\n" + "="*60)
     print("EXAMPLE 4: Data Augmentation Comparison")
@@ -213,7 +182,7 @@ def example_4_augmentation_comparison():
     return dataset_orig, dataset_aug
 
 
-def example_5_visualization():
+def example_4_visualization():
     """Example 5: Visualize dataset samples"""
     print("\n" + "="*60)
     print("EXAMPLE 5: Dataset Visualization")
@@ -242,7 +211,7 @@ def example_5_visualization():
     return dataset
 
 
-def example_6_config_based_setup():
+def example_5_config_based_setup():
     """Example 6: Configuration-based dataset setup"""
     print("\n" + "="*60)
     print("EXAMPLE 6: Configuration-based Setup")
@@ -283,7 +252,7 @@ def example_6_config_based_setup():
         return None, None
 
 
-def example_7_dataset_validation():
+def example_6_dataset_validation():
     """Example 7: Dataset validation and integrity checks"""
     print("\n" + "="*60)
     print("EXAMPLE 7: Dataset Validation")
@@ -319,7 +288,7 @@ def example_7_dataset_validation():
     return dataset, issues, stats
 
 
-def example_8_export_annotations():
+def example_7_export_annotations():
     """Example 8: Export annotations to different formats"""
     print("\n" + "="*60)
     print("EXAMPLE 8: Export Annotations")
@@ -361,7 +330,7 @@ def example_8_export_annotations():
     return dataset
 
 
-def example_9_scaling_visualization():
+def example_8_scaling_visualization():
     """Example 9: Visualize image before/after scaling"""
     print("="*60)
     print("EXAMPLE 9: Before/After Scaling Visualization")
@@ -448,7 +417,7 @@ def example_9_scaling_visualization():
     return dataset
 
 
-def example_10_augmentation_visualization():
+def example_9_augmentation_visualization():
     """Example 10: Visualize image before/after augmentation"""
     print("="*60) 
     print("EXAMPLE 10: Before/After Augmentation Visualization")
@@ -591,7 +560,7 @@ def example_10_augmentation_visualization():
     return dataset_orig, dataset_aug
 
 
-def example_11_sonar_enhancement_visualization():
+def example_10_sonar_enhancement_visualization():
     """Example 11: Visualize sonar-specific image enhancements"""
     print("="*60)
     print("EXAMPLE 11: Sonar Enhancement Visualization")
@@ -748,34 +717,33 @@ def main():
         # Run specific examples based on arguments
         if args.visualize_scaling:
             print("Running scaling visualization only...")
-            dataset = example_9_scaling_visualization()
+            dataset = example_8_scaling_visualization()
             
         elif args.augmentation:
             print("Running augmentation visualization only...")
-            dataset_orig, dataset_aug = example_10_augmentation_visualization()
+            dataset_orig, dataset_aug = example_9_augmentation_visualization()
             
         elif args.sonar_enhancement:
             print("Running sonar enhancement visualization only...")
-            dataset_no_enhance, dataset_enhance = example_11_sonar_enhancement_visualization()
+            dataset_no_enhance, dataset_enhance = example_10_sonar_enhancement_visualization()
             
         else:
             # Run all examples (default behavior)
             print("Running all examples...")
             dataset1 = example_1_basic_dataset()
-            datasets2 = example_2_temporal_splitting()
-            dataloaders3 = example_3_dataloader_integration()
-            dataset_orig, dataset_aug = example_4_augmentation_comparison()
-            dataset5 = example_5_visualization()
-            datasets6, dataloaders6 = example_6_config_based_setup()
-            dataset7, issues, stats = example_7_dataset_validation()
-            dataset8 = example_8_export_annotations()
+            dataloaders3 = example_2_dataloader_integration()
+            dataset_orig, dataset_aug = example_3_augmentation_comparison()
+            dataset5 = example_4_visualization()
+            datasets6, dataloaders6 = example_5_config_based_setup()
+            dataset7, issues, stats = example_6_dataset_validation()
+            dataset8 = example_7_export_annotations()
             
             print("\n" + "="*60)
             print("BONUS: Advanced Visualizations")
             print("="*60)
-            dataset9 = example_9_scaling_visualization()
-            dataset10_orig, dataset10_aug = example_10_augmentation_visualization()
-            dataset11_no_enhance, dataset11_enhance = example_11_sonar_enhancement_visualization()
+            dataset9 = example_8_scaling_visualization()
+            dataset10_orig, dataset10_aug = example_9_augmentation_visualization()
+            dataset11_no_enhance, dataset11_enhance = example_10_sonar_enhancement_visualization()
             
             print("\n" + "="*80)
             print("ALL EXAMPLES COMPLETED SUCCESSFULLY!")

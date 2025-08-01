@@ -10,7 +10,6 @@ Features:
 - YOLO format annotation parsing
 - Mixed resolution handling with smart resizing
 - Sonar-specific preprocessing and augmentations  
-- Temporal data splitting strategies
 - Class balancing and hard negative mining
 - Comprehensive validation and debugging tools
 - Framework-agnostic design with PyTorch integration
@@ -33,10 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from collections import defaultdict, Counter
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import KFold
+from torch.utils.data import Dataset
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,7 +44,7 @@ class SonarMineDataset(Dataset):
     PyTorch Dataset class for Sonar Mine Detection
     
     Handles YOLO format annotations for underwater mine detection in side scan sonar imagery.
-    Supports temporal splitting, class balancing, and sonar-specific preprocessing.
+    Supports class balancing and sonar-specific preprocessing.
     
     Args:
         data_path (str): Path to the Data directory containing year subdirectories
@@ -61,6 +57,7 @@ class SonarMineDataset(Dataset):
         balance_strategy (Optional[str]): Class balancing strategy - 'oversample_positive', 'undersample_negative', or None
         enhance_sonar (bool): Whether to apply sonar-specific image enhancements
         class_mapping (Dict[int, str]): Mapping from class IDs to class names
+        skip_init (bool): Skip initial dataset building (for external sample management)
     """
     
     def __init__(
@@ -74,7 +71,8 @@ class SonarMineDataset(Dataset):
         cache_images: bool = False,
         balance_strategy: Optional[str] = None,
         enhance_sonar: bool = True,
-        class_mapping: Dict[int, str] = {0: "MILCO", 1: "NOMBO"}
+        class_mapping: Dict[int, str] = {0: "MILCO", 1: "NOMBO"},
+        skip_init: bool = False
     ):
         
         self.data_path = Path(data_path)
@@ -93,18 +91,22 @@ class SonarMineDataset(Dataset):
         self.image_cache = {} if cache_images else None
         self.statistics = {}
         
-        # Build dataset index
-        logger.info(f"Building {split_type} dataset for years: {years}")
-        self._build_dataset_index()
-        
-        # Apply class balancing if specified
-        if balance_strategy:
-            self._apply_class_balancing()
-        
-        # Generate dataset statistics
-        self._generate_statistics()
-        
-        logger.info(f"Dataset created with {len(self.samples)} samples")
+        # Skip initialization if samples will be provided externally
+        if not skip_init:
+            # Build dataset index
+            logger.info(f"Building {split_type} dataset for years: {years}")
+            self._build_dataset_index()
+            
+            # Apply class balancing if specified
+            if balance_strategy:
+                self._apply_class_balancing()
+            
+            # Generate dataset statistics
+            self._generate_statistics()
+            
+            logger.info(f"Dataset created with {len(self.samples)} samples")
+        else:
+            logger.info(f"Dataset initialized with external sample management (file scanning skipped)")
         
     def _build_dataset_index(self):
         """
@@ -377,7 +379,7 @@ class SonarMineDataset(Dataset):
         
         # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
         # This enhances local contrast while preventing over-amplification
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
         enhanced = clahe.apply(gray)
         
         # Apply mild Gaussian blur to reduce sonar speckle noise
@@ -814,408 +816,3 @@ class SonarMineDataset(Dataset):
         df = pd.DataFrame(annotations)
         df.to_csv(output_path, index=False)
         logger.info(f"Annotations exported to {output_path}")
-
-
-def get_training_augmentations(image_size: Tuple[int, int]) -> A.Compose:
-    """
-    Create Albumentations pipeline for training data augmentation
-    
-    Args:
-        image_size (Tuple[int, int]): Target image size (height, width)
-        
-    Returns:
-        A.Compose: Albumentations pipeline
-    """
-    return A.Compose([
-        # Geometric augmentations
-        A.HorizontalFlip(p=0.5),
-        A.RandomRotate90(p=0.3),
-        A.ShiftScaleRotate(
-            shift_limit=0.1, 
-            scale_limit=0.2, 
-            rotate_limit=15, 
-            border_mode=cv2.BORDER_CONSTANT, 
-            value=114,
-            p=0.5
-        ),
-        
-        # Photometric augmentations
-        A.RandomBrightnessContrast(
-            brightness_limit=0.2, 
-            contrast_limit=0.2, 
-            p=0.5
-        ),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
-        A.Blur(blur_limit=3, p=0.2),
-        A.MedianBlur(blur_limit=3, p=0.1),
-        
-        # Sonar-specific augmentations
-        A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.3),
-        A.RandomGamma(gamma_limit=(80, 120), p=0.3),
-        A.HueSaturationValue(
-            hue_shift_limit=10,
-            sat_shift_limit=15,
-            val_shift_limit=10,
-            p=0.3
-        ),
-        
-        # Final normalization and tensor conversion
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(),
-    ], bbox_params=A.BboxParams(
-        format='pascal_voc',
-        label_fields=['labels'],
-        min_area=1,
-        min_visibility=0.1
-    ))
-
-
-def get_validation_transforms(image_size: Tuple[int, int]) -> A.Compose:
-    """
-    Create simple transforms for validation/test data
-    
-    Args:
-        image_size (Tuple[int, int]): Target image size (height, width)
-        
-    Returns:
-        A.Compose: Validation transforms
-    """
-    return A.Compose([
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(),
-    ], bbox_params=A.BboxParams(
-        format='pascal_voc',
-        label_fields=['labels']
-    ))
-
-
-def collate_fn(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, List[Dict[str, torch.Tensor]]]:
-    """
-    Custom collate function for DataLoader to handle variable-sized annotations
-    
-    Args:
-        batch (List[Dict[str, Any]]): Batch of samples
-        
-    Returns:
-        Tuple[torch.Tensor, List[Dict[str, torch.Tensor]]]: Batched images and targets
-    """
-    images = []
-    targets = []
-    
-    for sample in batch:
-        images.append(sample['image'])
-        
-        # Create target dictionary for each image
-        target = {
-            'boxes': sample['boxes'],
-            'labels': sample['labels'],
-            'image_id': sample['image_id'],
-            'area': sample['areas'],
-            'iscrowd': sample['iscrowd']
-        }
-        targets.append(target)
-    
-    # Stack images into a single tensor
-    images = torch.stack(images, dim=0)
-    
-    return images, targets
-
-
-class TemporalSplitter:
-    """
-    Utility class for creating temporal data splits
-    
-    Handles splitting the dataset based on years to prevent data leakage
-    and simulate real-world deployment scenarios.
-    """
-    
-    def __init__(self, train_years: List[str], val_years: List[str], test_years: List[str]):
-        """
-        Initialize temporal splitter
-        
-        Args:
-            train_years (List[str]): Years to use for training
-            val_years (List[str]): Years to use for validation
-            test_years (List[str]): Years to use for testing
-        """
-        self.train_years = train_years
-        self.val_years = val_years
-        self.test_years = test_years
-        
-        # Validate no overlap between splits
-        all_years = set(train_years + val_years + test_years)
-        if len(all_years) != len(train_years) + len(val_years) + len(test_years):
-            raise ValueError("Overlapping years detected between splits")
-    
-    def create_splits(self, data_path: str, **kwargs) -> Dict[str, SonarMineDataset]:
-        """
-        Create temporal splits
-        
-        Args:
-            data_path (str): Path to data directory
-            **kwargs: Additional arguments to pass to SonarMineDataset
-            
-        Returns:
-            Dict[str, SonarMineDataset]: Dictionary containing train/val/test datasets
-        """
-        # Get augmentations
-        image_size = kwargs.get('image_size', (512, 512))
-        train_augmentations = get_training_augmentations(image_size)
-        val_augmentations = get_validation_transforms(image_size)
-        
-        splits = {
-            'train': SonarMineDataset(
-                data_path=data_path,
-                years=self.train_years,
-                split_type='train',
-                augmentations=train_augmentations,
-                **kwargs
-            ),
-            'val': SonarMineDataset(
-                data_path=data_path,
-                years=self.val_years,
-                split_type='val',
-                augmentations=val_augmentations,
-                **kwargs
-            ),
-            'test': SonarMineDataset(
-                data_path=data_path,
-                years=self.test_years,
-                split_type='test',
-                augmentations=val_augmentations,
-                **kwargs
-            )
-        }
-        
-        return splits
-    
-    def create_dataloaders(self, data_path: str, batch_size: int = 16, 
-                          num_workers: int = 4, **kwargs) -> Dict[str, DataLoader]:
-        """
-        Create DataLoaders for all splits
-        
-        Args:
-            data_path (str): Path to data directory
-            batch_size (int): Batch size for training
-            num_workers (int): Number of worker processes
-            **kwargs: Additional arguments for SonarMineDataset
-            
-        Returns:
-            Dict[str, DataLoader]: Dictionary containing DataLoaders
-        """
-        datasets = self.create_splits(data_path, **kwargs)
-        dataloaders = {}
-        
-        for split_name, dataset in datasets.items():
-            shuffle = split_name == 'train'
-            drop_last = split_name == 'train'
-            
-            dataloader = DataLoader(
-                dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                num_workers=num_workers,
-                collate_fn=collate_fn,
-                pin_memory=torch.cuda.is_available(),
-                drop_last=drop_last,
-                persistent_workers=num_workers > 0,
-                prefetch_factor=2 if num_workers > 0 else None
-            )
-            dataloaders[split_name] = dataloader
-        
-        return dataloaders
-
-
-class SonarDatasetFactory:
-    """
-    Factory class for creating dataset instances with different configurations
-    """
-    
-    @staticmethod
-    def from_config(config_path: str, split_type: str = 'train') -> SonarMineDataset:
-        """
-        Create dataset from YAML configuration file
-        
-        Args:
-            config_path (str): Path to YAML configuration file
-            split_type (str): Type of split to create
-            
-        Returns:
-            SonarMineDataset: Configured dataset instance
-        """
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        dataset_config = config['dataset']
-        
-        # Get split-specific configuration
-        years = dataset_config['splits']['temporal'][f'{split_type}_years']
-        
-        # Get augmentations based on split type
-        image_size = tuple(dataset_config['image_size'])
-        if split_type == 'train' and dataset_config.get('augmentations', {}).get('enabled', True):
-            augmentations = get_training_augmentations(image_size)
-        else:
-            augmentations = get_validation_transforms(image_size)
-        
-        return SonarMineDataset(
-            data_path=dataset_config['data_path'],
-            years=years,
-            split_type=split_type,
-            image_size=image_size,
-            augmentations=augmentations,
-            normalize=dataset_config.get('normalize', True),
-            cache_images=dataset_config.get('cache_images', False),
-            balance_strategy=dataset_config.get('balance_strategy'),
-            enhance_sonar=dataset_config.get('enhance_sonar', True),
-            class_mapping=dataset_config.get('class_mapping', {0: "MILCO", 1: "NOMBO"})
-        )
-    
-    @staticmethod
-    def create_full_pipeline(config_path: str, batch_size: int = 16, 
-                           num_workers: int = 4) -> Tuple[Dict[str, SonarMineDataset], Dict[str, DataLoader]]:
-        """
-        Create complete training pipeline from configuration
-        
-        Args:
-            config_path (str): Path to configuration file
-            batch_size (int): Batch size for DataLoaders
-            num_workers (int): Number of worker processes
-            
-        Returns:
-            Tuple[Dict[str, SonarMineDataset], Dict[str, DataLoader]]: Datasets and DataLoaders
-        """
-        splits = ['train', 'val', 'test']
-        datasets = {split: SonarDatasetFactory.from_config(config_path, split) 
-                   for split in splits}
-        
-        dataloaders = {}
-        for split_name, dataset in datasets.items():
-            shuffle = split_name == 'train'
-            drop_last = split_name == 'train'
-            
-            dataloader = DataLoader(
-                dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                num_workers=num_workers,
-                collate_fn=collate_fn,
-                pin_memory=torch.cuda.is_available(),
-                drop_last=drop_last,
-                persistent_workers=num_workers > 0
-            )
-            dataloaders[split_name] = dataloader
-        
-        return datasets, dataloaders
-
-
-def create_sample_config(output_path: str = "config/dataset_config.yaml"):
-    """
-    Create a sample configuration file
-    
-    Args:
-        output_path (str): Path where to save the configuration file
-    """
-    config = {
-        'dataset': {
-            'data_path': "./Data/",
-            'image_size': [512, 512],
-            'normalize': True,
-            'cache_images': False,
-            'enhance_sonar': True,
-            
-            'splits': {
-                'temporal': {
-                    'train_years': ["2010", "2015", "2017"],
-                    'val_years': ["2018"],
-                    'test_years': ["2021"]
-                }
-            },
-            
-            'augmentations': {
-                'enabled': True,
-                'horizontal_flip': 0.5,
-                'rotation_limit': 15,
-                'brightness_contrast': 0.2,
-                'noise_probability': 0.3
-            },
-            
-            'class_mapping': {
-                0: "MILCO",
-                1: "NOMBO"
-            },
-            
-            'balance_strategy': None  # Options: "oversample_positive", "undersample_negative", None
-        }
-    }
-    
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    with open(output_path, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False, indent=2)
-    
-    print(f"Sample configuration saved to {output_path}")
-
-
-if __name__ == "__main__":
-    """
-    Example usage and testing
-    """
-    
-    # Create sample configuration
-    create_sample_config()
-    
-    # Example 1: Basic dataset creation
-    print("Creating basic dataset...")
-    dataset = SonarMineDataset(
-        data_path="./Data/",
-        years=["2021"],  # Start with small dataset for testing
-        split_type="train",
-        image_size=(512, 512),
-        enhance_sonar=True
-    )
-    
-    print(f"Dataset created with {len(dataset)} samples")
-    print(f"Statistics: {dataset.get_statistics()}")
-    
-    # Example 2: Temporal splitting
-    print("\nCreating temporal splits...")
-    splitter = TemporalSplitter(
-        train_years=["2010", "2015"],
-        val_years=["2018"], 
-        test_years=["2021"]
-    )
-    
-    datasets = splitter.create_splits("./Data/", image_size=(512, 512))
-    print(f"Train: {len(datasets['train'])} samples")
-    print(f"Val: {len(datasets['val'])} samples") 
-    print(f"Test: {len(datasets['test'])} samples")
-    
-    # Example 3: DataLoader creation
-    print("\nCreating DataLoaders...")
-    dataloaders = splitter.create_dataloaders(
-        data_path="./Data/",
-        batch_size=4,
-        num_workers=0,  # Set to 0 for debugging
-        image_size=(512, 512)
-    )
-    
-    # Test loading a batch
-    train_loader = dataloaders['train']
-    for batch_idx, (images, targets) in enumerate(train_loader):
-        print(f"Batch {batch_idx}: Images shape: {images.shape}")
-        print(f"Number of targets: {len(targets)}")
-        if batch_idx == 0:  # Only test first batch
-            break
-    
-    # Example 4: Validation
-    print("\nValidating dataset...")
-    issues, stats = dataset.validate_dataset()
-    print(f"Validation stats: {stats}")
-    if issues:
-        print(f"Found {len(issues)} issues (showing first 5):")
-        for issue in issues[:5]:
-            print(f"  - {issue}")
-    
-    print("\nDataset class implementation complete!") 

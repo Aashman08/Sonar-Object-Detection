@@ -59,34 +59,6 @@ def test_basic_functionality():
         print(f"✗ Error: {e}")
         return False
 
-
-def test_temporal_splitting():
-    """Test temporal data splitting"""
-    print("\nTesting temporal splitting...")
-    
-    try:
-        splitter = TemporalSplitter(
-            train_years=["2015"],  # Small dataset for testing
-            val_years=["2021"],
-            test_years=["2018"]
-        )
-        
-        datasets = splitter.create_splits(
-            data_path="./Data/",
-            image_size=(512, 512)
-        )
-        
-        print(f"✓ Temporal splits created:")
-        for split_name, dataset in datasets.items():
-            print(f"  - {split_name}: {len(dataset)} samples")
-        
-        return True
-        
-    except Exception as e:
-        print(f"✗ Error in temporal splitting: {e}")
-        return False
-
-
 def test_dataloader():
     """Test DataLoader integration"""
     print("\nTesting DataLoader integration...")
@@ -168,7 +140,6 @@ def main():
     tests = [
         ("Data Path", test_data_path),
         ("Basic Functionality", test_basic_functionality),
-        ("Temporal Splitting", test_temporal_splitting),
         ("DataLoader Integration", test_dataloader),
     ]
     

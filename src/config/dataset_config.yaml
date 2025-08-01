@@ -5,7 +5,7 @@ dataset:
     horizontal_flip: 0.5
     noise_probability: 0.3
     rotation_limit: 15
-  balance_strategy: null
+  balance_strategy: oversample_positive
   cache_images: false
   class_mapping:
     0: MILCO
@@ -17,12 +17,11 @@ dataset:
   - 512
   normalize: true
   splits:
-    temporal:
-      test_years:
-      - '2021'
-      train_years:
-      - '2010'
-      - '2015'
-      - '2017'
-      val_years:
-      - '2018'
+    stratified:
+      random_state: 42
+      test_ratio: 0.15
+      train_ratio: 0.7
+      val_ratio: 0.15
+training:
+  batch_size: 16
+  num_workers: 4
