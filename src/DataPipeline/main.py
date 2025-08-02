@@ -12,7 +12,7 @@ Author: Sonar Mine Detection Team
 Date: 2024
 """
 
-from data_processing import SonarDatasetFactory, create_sample_config
+from .DataProcessing import SonarDatasetFactory
 
 
 def main():
@@ -22,16 +22,16 @@ def main():
     print("🎯 Sonar Mine Detection Dataset Pipeline")
     print("=" * 50)
     
-    # Step 1: Ensure configuration exists
-    print("📄 Creating/updating configuration file...")
-    create_sample_config()
-    print("✅ Configuration ready at: config/dataset_config.yaml")
+    # # Step 1: Ensure configuration exists
+    # print("📄 Creating/updating configuration file...")
+    # create_sample_config()
+    # print("✅ Configuration ready at: config/dataset_config.yaml")
     
     # Step 2: Create complete pipeline from configuration (SINGLE source of truth)
     print("\n🏭 Creating complete training pipeline from configuration...")
     try:
         datasets, dataloaders = SonarDatasetFactory.create_full_pipeline(
-            config_path="config/dataset_config.yaml"
+            config_path="../Config/sonar_dataset_config.yaml"
         )
         
         print("✅ Pipeline created successfully!")

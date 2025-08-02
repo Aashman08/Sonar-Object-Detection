@@ -56,6 +56,8 @@ class SonarMineDataset(Dataset):
         cache_images (bool): Whether to cache images in memory for faster loading
         balance_strategy (Optional[str]): Class balancing strategy - 'oversample_positive', 'undersample_negative', or None
         enhance_sonar (bool): Whether to apply sonar-specific image enhancements
+        clahe_clip_limit (float): CLAHE clip limit for contrast enhancement (default: 2.0)
+        clahe_tile_grid_size (Tuple[int, int]): CLAHE tile grid size for local adaptation (default: (8, 8))
         class_mapping (Dict[int, str]): Mapping from class IDs to class names
         skip_init (bool): Skip initial dataset building (for external sample management)
     """
@@ -71,6 +73,8 @@ class SonarMineDataset(Dataset):
         cache_images: bool = False,
         balance_strategy: Optional[str] = None,
         enhance_sonar: bool = True,
+        clahe_clip_limit: float = 2.0,
+        clahe_tile_grid_size: Tuple[int, int] = (8, 8),
         class_mapping: Dict[int, str] = {0: "MILCO", 1: "NOMBO"},
         skip_init: bool = False
     ):
@@ -84,6 +88,8 @@ class SonarMineDataset(Dataset):
         self.cache_images = cache_images
         self.balance_strategy = balance_strategy
         self.enhance_sonar = enhance_sonar
+        self.clahe_clip_limit = clahe_clip_limit
+        self.clahe_tile_grid_size = clahe_tile_grid_size
         self.class_mapping = class_mapping
         
         # Initialize containers
@@ -106,7 +112,7 @@ class SonarMineDataset(Dataset):
             
             logger.info(f"Dataset created with {len(self.samples)} samples")
         else:
-            logger.info(f"Dataset initialized with external sample management (file scanning skipped)")
+            logger.info(f"Dataset initialized with pre-stratified samples from StratifiedSplitter - samples already selected and balanced")
         
     def _build_dataset_index(self):
         """
@@ -379,7 +385,8 @@ class SonarMineDataset(Dataset):
         
         # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
         # This enhances local contrast while preventing over-amplification
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+        # Use configurable parameters from config file
+        clahe = cv2.createCLAHE(clipLimit=self.clahe_clip_limit, tileGridSize=self.clahe_tile_grid_size)
         enhanced = clahe.apply(gray)
         
         # Apply mild Gaussian blur to reduce sonar speckle noise

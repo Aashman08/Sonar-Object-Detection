@@ -1,9 +1,11 @@
 dataset:
   augmentations:
     brightness_contrast: 0.2
+    contrast_limit: 0.2         # Moderate contrast changes
     enabled: true
-    horizontal_flip: 0.5
-    noise_probability: 0.3
+    horizontal_flip: 0.4
+    vertical_flip: 0.1   
+    noise_probability: 0.1
     rotation_limit: 15
   balance_strategy: oversample_positive
   cache_images: false
@@ -12,6 +14,9 @@ dataset:
     1: NOMBO
   data_path: ./Data/
   enhance_sonar: true
+  clahe_settings:
+    clip_limit: 2.0
+    tile_grid_size: [4, 4]  # coarse grainned
   image_size:
   - 512
   - 512

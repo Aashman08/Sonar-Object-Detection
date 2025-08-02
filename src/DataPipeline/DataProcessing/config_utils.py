@@ -27,6 +27,10 @@ def create_sample_config(output_path: str = "config/dataset_config.yaml"):
             'normalize': True,
             'cache_images': False,
             'enhance_sonar': True,
+            'clahe_settings': {
+                'clip_limit': 2.0,
+                'tile_grid_size': [4, 4]  # coarse grainned
+            },
             
             'splits': {
                 'stratified': {

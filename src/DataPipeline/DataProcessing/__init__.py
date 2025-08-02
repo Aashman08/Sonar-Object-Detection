@@ -16,10 +16,10 @@ Date: 2024
 """
 
 from .sonar_dataset import SonarMineDataset
-from .augmentations import get_training_augmentations, get_validation_transforms
-from .data_splitters import StratifiedSplitter
+from .sonar_augmentations import get_training_augmentations, get_validation_transforms
+from .stratified_data_splitter import StratifiedSplitter
 from .dataset_utils import collate_fn
-from .dataset_factory import SonarDatasetFactory
+from .sonar_dataset_factory import SonarDatasetFactory
 from .config_utils import create_sample_config
 
 __all__ = [

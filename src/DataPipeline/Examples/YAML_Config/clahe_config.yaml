@@ -1,0 +1,60 @@
+# CLAHE (Contrast Limited Adaptive Histogram Equalization) Configuration
+# =======================================================================
+# Experiment with different CLAHE parameters to find optimal sonar enhancement
+
+# Image selection
+image_selection:
+  data_path: "../Data/"
+  years: ["2021"]  # Which years to sample from
+  num_samples: 6   # How many random images to compare
+  min_objects: 1   # Minimum objects required in image
+  
+# CLAHE Parameters to Test
+# ========================
+# clip_limit: Higher = more contrast enhancement (but more noise)
+# tile_grid_size: Smaller tiles = more local adaptation (but can create artifacts)
+
+clahe_variants:
+  # Conservative (subtle enhancement)
+  conservative:
+    clip_limit: 1.5
+    tile_grid_size: [8, 8]
+    
+  # Moderate (balanced enhancement) 
+  moderate:
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+    
+  # Aggressive (strong enhancement)
+  aggressive:
+    clip_limit: 3.0
+    tile_grid_size: [8, 8]
+    
+  # Fine-grained (more local adaptation)
+  fine_grained:
+    clip_limit: 2.0
+    tile_grid_size: [16, 16]
+    
+  # Coarse-grained (more global)
+  coarse_grained:
+    clip_limit: 2.0
+    tile_grid_size: [4, 4]
+
+# Additional processing
+processing:
+  gaussian_blur_kernel: 3  # Noise reduction (0 = disabled)
+  normalize_output: true   # Normalize to 0-255 range
+  
+# Visualization settings
+visualization:
+  figure_size: [20, 12]
+  save_results: true
+  output_dir: "clahe_comparison_results"
+  show_histograms: true    # Show intensity histograms
+  show_statistics: true    # Print enhancement statistics
+
+# Evaluation metrics to help you decide
+evaluation:
+  calculate_contrast: true      # Measure contrast improvement
+  calculate_sharpness: true     # Measure edge sharpness
+  calculate_noise_level: true   # Estimate noise level

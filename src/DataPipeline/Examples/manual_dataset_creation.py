@@ -44,14 +44,14 @@ def complete_manual_workflow():
     )
     print("✅ Splitter configured with 70/20/10 split and positive oversampling")
     
-    # Step 2: Create datasets with custom settings
-    print("\n🏗️  Step 2: Creating stratified datasets...")
+    # Step 2: Create datasets with custom settings - using ALL years
+    print("\n🏗️  Step 2: Creating stratified datasets with ALL years...")
     datasets = splitter.create_splits(
         data_path="./Data/", 
         image_size=(512, 512),   # High resolution for training
         enhance_sonar=True,      # Apply sonar enhancement
         normalize=True,          # Normalize images
-        years=["2010", "2015", "2017", "2018", "2021"]           
+        years=["2010", "2015", "2017", "2018", "2021"]  # All available years         
     )
     
     print("✅ Datasets created:")

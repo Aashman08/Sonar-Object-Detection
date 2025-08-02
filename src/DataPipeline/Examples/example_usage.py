@@ -30,7 +30,7 @@ import argparse
 from pathlib import Path
 
 # Import our custom dataset classes
-from sonar_dataset import (
+from data_processing.sonar_dataset import (
     SonarMineDataset,
     TemporalSplitter,
     SonarDatasetFactory,
@@ -223,7 +223,7 @@ def example_5_config_based_setup():
     if not Path(config_path).exists():
         print(f"Configuration file not found at {config_path}")
         print("Creating sample configuration...")
-        from sonar_dataset import create_sample_config
+        from data_processing.sonar_dataset import create_sample_config
         create_sample_config(config_path)
     
     try:

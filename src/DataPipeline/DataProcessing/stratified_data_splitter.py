@@ -54,18 +54,25 @@ class StratifiedSplitter:
         self.random_state = random_state
         self.balance_strategy = balance_strategy
         
-    def _collect_all_samples(self, data_path: str) -> List[Dict[str, Any]]:
+    def _collect_all_samples(self, data_path: str, years: List[str] = None) -> List[Dict[str, Any]]:
         """
-        Collect all samples from all years with metadata for stratification
+        Collect all samples from specified years with metadata for stratification
+        
+        Args:
+            data_path (str): Path to data directory
+            years (List[str]): List of years to scan, defaults to all available years
         
         Returns:
             List[Dict]: All samples with stratification keys
         """
         data_path = Path(data_path)
         all_samples = []
-        years = ["2010", "2015", "2017", "2018", "2021"]  # All available years
         
-        logger.info("Collecting samples from all years for stratified splitting...")
+        # Use provided years or default to all available years
+        if years is None:
+            years = ["2010", "2015", "2017", "2018", "2021"]
+        
+        logger.info(f"Collecting samples from years: {years}")
         
         for year in years:
             year_path = data_path / year
@@ -84,7 +91,7 @@ class StratifiedSplitter:
                 # Corresponding annotation file
                 ann_path = img_path.with_suffix('.txt')
                 
-                # Check if sample has objects
+                # Check what type of objects are in the image
                 has_objects = False
                 class_labels = []
                 if ann_path.exists():
@@ -100,21 +107,21 @@ class StratifiedSplitter:
                     except Exception as e:
                         logger.warning(f"Error reading annotation {ann_path}: {e}")
                 
-                # Create stratification key combining presence and class distribution
-                if has_objects:
-                    # For positive samples, create key based on dominant class
-                    if class_labels:
-                        class_counts = Counter(class_labels)
-                        dominant_class = class_counts.most_common(1)[0][0]
-                        # Multi-class scenario: "positive_class0", "positive_class1", etc.
-                        if len(set(class_labels)) > 1:
-                            strat_key = f"positive_mixed"  # Mixed classes in same image
-                        else:
-                            strat_key = f"positive_class{dominant_class}"
-                    else:
-                        strat_key = "positive_unknown"
+                # Create meaningful stratification for mine detection
+                if not has_objects:
+                    strat_key = "no_object"
                 else:
-                    strat_key = "negative"
+                    # Determine dominant mine type
+                    class_counts = Counter(class_labels)
+                    dominant_class = class_counts.most_common(1)[0][0]
+                    
+                    # Based on your class mapping: 0=MILCO (mine-like), 1=NOMBO (non-mine-like)
+                    if dominant_class == 0:
+                        strat_key = "mine_like"      # MILCO mines
+                    elif dominant_class == 1:
+                        strat_key = "non_mine_like"  # NOMBO mines  
+                    else:
+                        strat_key = "mine_like"      # Default to mine-like for unknown classes
                 
                 sample = {
                     'image_path': str(img_path),
@@ -128,13 +135,34 @@ class StratifiedSplitter:
         
         logger.info(f"Collected {len(all_samples)} total samples")
         
-        # Print stratification distribution
+        # Print initial distribution
         strat_counts = Counter([s['strat_key'] for s in all_samples])
-        logger.info("Stratification distribution:")
+        logger.info("Initial stratification distribution:")
         for key, count in strat_counts.items():
             logger.info(f"  {key}: {count} samples ({100*count/len(all_samples):.1f}%)")
+        
+        # Remove half of no-object images to balance dataset
+        no_object_samples = [s for s in all_samples if s['strat_key'] == 'no_object']
+        mine_like_samples = [s for s in all_samples if s['strat_key'] == 'mine_like']
+        non_mine_like_samples = [s for s in all_samples if s['strat_key'] == 'non_mine_like']
+        
+        # Keep only half of no-object images (randomly selected)
+        import random
+        random.seed(self.random_state)  # Use same random state for reproducibility
+        reduced_no_object = random.sample(no_object_samples, len(no_object_samples) // 2)
+        
+        # Combine balanced samples
+        balanced_samples = mine_like_samples + non_mine_like_samples + reduced_no_object
+        
+        logger.info(f"Balanced dataset: {len(balanced_samples)} samples (removed {len(no_object_samples) - len(reduced_no_object)} no-object images)")
+        
+        # Print final distribution
+        final_strat_counts = Counter([s['strat_key'] for s in balanced_samples])
+        logger.info("Final balanced stratification distribution:")
+        for key, count in final_strat_counts.items():
+            logger.info(f"  {key}: {count} samples ({100*count/len(balanced_samples):.1f}%)")
             
-        return all_samples
+        return balanced_samples
     
     def _create_stratified_splits(self, samples: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -195,49 +223,34 @@ class StratifiedSplitter:
         """
         # Import locally since sonar_dataset is now in the same package
         from .sonar_dataset import SonarMineDataset
-        from .augmentations import get_training_augmentations, get_validation_transforms
+        from .sonar_augmentations import get_augmentations_from_config
         
         # Collect all samples and create stratified splits
-        all_samples = self._collect_all_samples(data_path)
+        years_to_use = kwargs.get('years', None)  # Extract years from kwargs
+        all_samples = self._collect_all_samples(data_path, years_to_use)
         sample_splits = self._create_stratified_splits(all_samples)
         
-        # Get augmentations
+        # Get augmentation configurations
         image_size = kwargs.get('image_size', (512, 512))
-        train_augmentations = get_training_augmentations(image_size)
-        val_augmentations = get_validation_transforms(image_size)
+        augmentations_config = kwargs.get('augmentations_config', {})
         
         # Create datasets with balanced training
         datasets = {}
         
         for split_name, split_samples in sample_splits.items():
-            # Extract years for this split (for compatibility with existing dataset class)
-            years_in_split = list(set([s['year'] for s in split_samples]))
-            
             # Determine augmentations and balance strategy
+            augmentations = get_augmentations_from_config(
+                augmentations_config, image_size, split_name
+            )
             if split_name == 'train':
-                augmentations = train_augmentations
-                balance_strategy = self.balance_strategy
+                # Use config value if provided, otherwise fall back to self.balance_strategy
+                balance_strategy = kwargs.get('balance_strategy', self.balance_strategy)
             else:
-                augmentations = val_augmentations
                 balance_strategy = None  # Don't balance val/test sets
             
-            # Remove 'years' from kwargs to avoid duplicate parameter error
-            dataset_kwargs = kwargs.copy()
-            dataset_kwargs.pop('years', None)  # Remove years if present
-            
-            dataset = SonarMineDataset(
-                data_path=data_path,
-                years=years_in_split,
-                split_type=split_name,
-                augmentations=augmentations,
-                balance_strategy=balance_strategy,
-                skip_init=True,  # ← OPTIMIZATION: Skip redundant initialization
-                **dataset_kwargs
-            )
-            
-            # Override the samples with our stratified split
             # Convert our sample format to dataset's expected format
             dataset_samples = []
+            years_in_split = set()
             for i, sample in enumerate(split_samples):
                 dataset_sample = {
                     'sample_id': i,
@@ -247,14 +260,33 @@ class StratifiedSplitter:
                     'has_objects': sample['has_objects']
                 }
                 dataset_samples.append(dataset_sample)
+                years_in_split.add(sample['year'])
             
+            # Create dataset directly with the stratified samples
+            dataset = SonarMineDataset(
+                data_path=data_path,
+                years=list(years_in_split),
+                split_type=split_name,
+                augmentations=augmentations,
+                balance_strategy=balance_strategy,
+                image_size=kwargs.get('image_size', (512, 512)),
+                normalize=kwargs.get('normalize', True),
+                cache_images=kwargs.get('cache_images', False),
+                enhance_sonar=kwargs.get('enhance_sonar', True),
+                class_mapping=kwargs.get('class_mapping', {0: "MILCO", 1: "NOMBO"}),
+                clahe_clip_limit=kwargs.get('clahe_clip_limit', 2.0),
+                clahe_tile_grid_size=kwargs.get('clahe_tile_grid_size', (8, 8)),
+                skip_init=True  # Skip initialization since we'll set samples manually
+            )
+            
+            # Set the pre-stratified samples
             dataset.samples = dataset_samples
             
             # Apply class balancing only to training set
             if split_name == 'train' and balance_strategy:
                 dataset._apply_class_balancing()
             
-            # Regenerate statistics
+            # Generate final statistics
             dataset._generate_statistics()
             
             datasets[split_name] = dataset

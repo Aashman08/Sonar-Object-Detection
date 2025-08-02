@@ -1,0 +1,104 @@
+# Data Augmentation Configuration for Sonar Mine Detection
+# ========================================================
+# Experiment with different augmentation parameters to find optimal training settings
+
+# Image selection
+image_selection:
+  data_path: "../Data/"
+  years: ["2021"]  # Which years to sample from
+  num_samples: 4   # How many random images to compare
+  min_objects: 1   # Minimum objects required in image
+
+# Augmentation Variants to Test
+# =============================
+# Each variant tests different augmentation strategies for sonar imagery
+
+augmentation_variants:
+  # No augmentation (baseline)
+  none:
+    enabled: false
+    
+  # Conservative (minimal augmentation)
+  conservative:
+    enabled: true
+    horizontal_flip: 0.3        # 30% chance
+    vertical_flip: 0.2          # 20% chance  
+    rotation_limit: 10          # ±10 degrees
+    brightness_limit: 0.1       # ±10% brightness
+    contrast_limit: 0.1         # ±10% contrast
+    blur_limit: 3               # Max blur kernel size
+    noise_limit: 0.02           # 2% noise
+    
+  # Moderate (balanced augmentation)
+  moderate:
+    enabled: true
+    horizontal_flip: 0.5        # 50% chance
+    vertical_flip: 0.3          # 30% chance
+    rotation_limit: 20          # ±20 degrees
+    brightness_limit: 0.2       # ±20% brightness
+    contrast_limit: 0.2         # ±20% contrast
+    blur_limit: 5               # Max blur kernel size
+    noise_limit: 0.05           # 5% noise
+    
+  # Aggressive (strong augmentation)
+  aggressive:
+    enabled: true
+    horizontal_flip: 0.5        # 50% chance
+    vertical_flip: 0.4          # 40% chance
+    rotation_limit: 30          # ±30 degrees
+    brightness_limit: 0.3       # ±30% brightness
+    contrast_limit: 0.3         # ±30% contrast
+    blur_limit: 7               # Max blur kernel size
+    noise_limit: 0.08           # 8% noise
+    
+  # Sonar-specific (tailored for underwater imagery)
+  sonar_optimized:
+    enabled: true
+    horizontal_flip: 0.4        # Horizontal patterns matter less
+    vertical_flip: 0.1          # Vertical orientation usually important
+    rotation_limit: 15          # Small rotations (sonar usually aligned)
+    brightness_limit: 0.25      # Sonar intensity can vary significantly
+    contrast_limit: 0.2         # Moderate contrast changes
+    blur_limit: 3               # Slight blur (sonar naturally noisy)
+    noise_limit: 0.03           # Low noise (sonar already has noise)
+    
+# Advanced augmentation options
+advanced_options:
+  # Geometric transformations
+  enable_shear: false          # Shear transformation (rarely good for sonar)
+  shear_limit: 10             # ±10 degrees if enabled
+  
+  # Color/intensity augmentations  
+  enable_hue_shift: false      # Hue shifting (not relevant for grayscale)
+  hue_shift_limit: 10         # ±10 degrees if enabled
+  
+  # Spatial augmentations
+  enable_elastic: false        # Elastic deformation (can distort mines)
+  elastic_alpha: 50           # Deformation strength
+  elastic_sigma: 5            # Deformation smoothness
+  
+  # Dropout augmentations
+  enable_cutout: false         # Random rectangular cutouts
+  cutout_holes: 2             # Number of holes
+  cutout_size: 32             # Size of each hole
+
+# Visualization settings
+visualization:
+  figure_size: [18, 12]
+  save_results: true
+  output_dir: "augmentation_comparison_results"
+  show_multiple_versions: 3    # Show N different augmented versions
+  show_bounding_boxes: true    # Overlay bounding boxes
+  
+# Evaluation metrics for augmentation quality
+evaluation:
+  check_bbox_preservation: true    # Ensure bounding boxes stay valid
+  calculate_intensity_stats: true  # Compare intensity distributions
+  measure_object_visibility: true  # Subjective object clarity score
+  
+# Training simulation (helps evaluate augmentation impact)
+training_simulation:
+  enabled: true
+  simulate_batches: 5          # Generate N batches with augmentations
+  batch_size: 8               # Samples per batch
+  show_batch_diversity: true   # Visualize diversity within batches
